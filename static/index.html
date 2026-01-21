@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Blog Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Arya Blog Generator</h1>
+            <p class="subtitle">Powered by NeuLeap</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Generation Form -->
+            <div class="card generation-section">
+                <h2>Generate New Blog</h2>
+                <form id="blogForm">
+                    <div class="form-group">
+                        <label for="topic">Blog Topic:</label>
+                        <input 
+                            type="text" 
+                            id="topic" 
+                            name="topic" 
+                            placeholder="Enter your blog topic (e.g., 'The Future of AI')"
+                            required
+                        >
+                    </div>
+                    <button type="submit" id="generateBtn" class="btn btn-primary">
+                        Generate Blog
+                    </button>
+                </form>
+                
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Generating your blog post... This may take a minute.</p>
+                    <p class="loading-steps">
+                        <span id="step1">✓ Researching topic...</span><br>
+                        <span id="step2">⏳ Creating title...</span><br>
+                        <span id="step3">⏳ Writing content...</span><br>
+                        <span id="step4">⏳ Editing & refining...</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Generated Blog Display -->
+            <div id="generatedBlog" class="card blog-display hidden">
+                <h2>Generated Blog Post</h2>
+                <div class="blog-content">
+                    <h3 id="blogTitle"></h3>
+                    <p class="blog-meta">Topic: <span id="blogTopic"></span></p>
+                    <div id="blogContent"></div>
+                </div>
+            </div>
+
+            <!-- All Blogs List -->
+            <div class="card blogs-section">
+                <div class="section-header">
+                    <h2>All Blog Posts</h2>
+                    <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+                </div>
+                <div id="blogsList">
+                    <p class="empty-state">No blogs yet. Generate your first one!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
