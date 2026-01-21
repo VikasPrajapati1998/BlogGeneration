@@ -13,6 +13,26 @@
             <p class="subtitle">Powered by NeuLeap</p>
         </header>
 
+        <!-- Stats Dashboard -->
+        <div class="stats-dashboard">
+            <div class="stat-card">
+                <div class="stat-number" id="totalBlogs">0</div>
+                <div class="stat-label">Total Blogs</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="stat-number" id="pendingBlogs">0</div>
+                <div class="stat-label">Pending Approval</div>
+            </div>
+            <div class="stat-card approved">
+                <div class="stat-number" id="approvedBlogs">0</div>
+                <div class="stat-label">Approved</div>
+            </div>
+            <div class="stat-card rejected">
+                <div class="stat-number" id="rejectedBlogs">0</div>
+                <div class="stat-label">Rejected</div>
+            </div>
+        </div>
+
         <div class="main-content">
             <!-- Generation Form -->
             <div class="card generation-section">
@@ -49,21 +69,49 @@
             <div id="generatedBlog" class="card blog-display hidden">
                 <h2>Generated Blog Post</h2>
                 <div class="blog-content">
+                    <div class="status-badge" id="generatedBlogStatus"></div>
                     <h3 id="blogTitle"></h3>
                     <p class="blog-meta">Topic: <span id="blogTopic"></span></p>
                     <div id="blogContent"></div>
+                    <div id="reviewActions" class="review-actions hidden">
+                        <button class="btn btn-success" onclick="approveBlog()">
+                            ✓ Approve Blog
+                        </button>
+                        <button class="btn btn-danger" onclick="showRejectModal()">
+                            ✗ Reject Blog
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- All Blogs List -->
+            <!-- Filter Tabs -->
             <div class="card blogs-section">
                 <div class="section-header">
                     <h2>All Blog Posts</h2>
+                    <div class="filter-tabs">
+                        <button class="tab-btn active" onclick="filterBlogs('all')">All</button>
+                        <button class="tab-btn" onclick="filterBlogs('pending')">Pending</button>
+                        <button class="tab-btn" onclick="filterBlogs('approved')">Approved</button>
+                        <button class="tab-btn" onclick="filterBlogs('rejected')">Rejected</button>
+                    </div>
                     <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
                 </div>
                 <div id="blogsList">
                     <p class="empty-state">No blogs yet. Generate your first one!</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Modal - IMPORTANT: hidden class and display:none by default -->
+    <div id="rejectModal" class="modal hidden" style="display: none;">
+        <div class="modal-content">
+            <h3>Reject Blog Post</h3>
+            <p>Please provide a reason for rejection:</p>
+            <textarea id="rejectionReason" rows="4" placeholder="Enter rejection reason..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeRejectModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="rejectBlog()">Reject</button>
             </div>
         </div>
     </div>
