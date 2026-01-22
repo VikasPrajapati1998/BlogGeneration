@@ -266,7 +266,7 @@ async def review_blog(
         # Update database with workflow result
         if result['approval_status'] == "approved":
             blog.status = ApprovalStatus.APPROVED
-            blog.approved_at = datetime.utcnow()
+            blog.approved_at = datetime.now(datetime.timezone.utc)
             blog.rejection_reason = None
             print(f"[API] ✓ Blog {blog_id} approved")
         elif result['approval_status'] == "rejected":
