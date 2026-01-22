@@ -3,10 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 import uvicorn
 import os
 import uuid
@@ -67,8 +67,7 @@ class BlogResponse(BaseModel):
     approved_at: Optional[str] = None
     rejection_reason: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
@@ -102,12 +101,12 @@ def generate_blog_async(topic: str, thread_id: str, blog_id: int):
         if blog_post:
             blog_post.title = blog_data["title"]
             blog_post.content = blog_data["content"]
-            blog_post.status = ApprovalStatus.PENDING  # CRITICAL: Set to PENDING
+            blog_post.status = ApprovalStatus.PENDING
             db.commit()
-            print(f"[Background] ✓ Blog generated successfully: {thread_id}")
+            print(f"[Background] Blog generated successfully: {thread_id}")
             print(f"[Background] Status: PENDING (awaiting human approval)")
     except Exception as e:
-        print(f"[Background] ✗ Error generating blog: {str(e)}")
+        print(f"[Background] Error generating blog: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -139,7 +138,7 @@ async def create_blog(
             topic=request.topic,
             title="Generating...",
             content="Blog generation in progress...",
-            status=ApprovalStatus.PENDING  # CRITICAL: Start as PENDING
+            status=ApprovalStatus.PENDING
         )
         db.add(blog_post)
         db.commit()
@@ -177,7 +176,7 @@ async def get_all_blogs(
         
         # Filter by status if provided
         if status:
-            if status.upper() in ["PENDING", "APPROVED", "REJECTED"]:
+            if status.lower() in ["pending", "approved", "rejected"]:
                 query = query.filter(BlogPost.status == ApprovalStatus[status.upper()])
         
         blogs = query.order_by(BlogPost.created_at.desc()).all()
@@ -248,7 +247,7 @@ async def review_blog(
         )
     
     try:
-        print(f"\n[API] Review request for blog {blog_id}")
+        print(f"[API] Review request for blog {blog_id}")
         print(f"[API] Thread ID: {blog.thread_id}")
         print(f"[API] Action: {request.action}")
         
@@ -266,13 +265,13 @@ async def review_blog(
         # Update database with workflow result
         if result['approval_status'] == "approved":
             blog.status = ApprovalStatus.APPROVED
-            blog.approved_at = datetime.now(datetime.timezone.utc)
+            blog.approved_at = datetime.now(timezone.utc)
             blog.rejection_reason = None
-            print(f"[API] ✓ Blog {blog_id} approved")
+            print(f"[API] Blog {blog_id} approved")
         elif result['approval_status'] == "rejected":
             blog.status = ApprovalStatus.REJECTED
             blog.rejection_reason = request.rejection_reason or "No reason provided"
-            print(f"[API] ✗ Blog {blog_id} rejected: {blog.rejection_reason}")
+            print(f"[API] Blog {blog_id} rejected: {blog.rejection_reason}")
         
         db.commit()
         db.refresh(blog)

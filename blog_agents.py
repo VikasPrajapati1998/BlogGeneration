@@ -1,19 +1,24 @@
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import TypedDict
 from dotenv import load_dotenv
 import sqlite3
+import os
 
 load_dotenv()
 
 # -----------------------------
 # LLM Configuration
 # -----------------------------
+# Get Ollama URL from environment variable (set in docker-compose.yml)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
 llm = ChatOllama(
     model="qwen2.5:0.5b",
     temperature=0.7,
+    base_url=OLLAMA_BASE_URL,
 )
 
 # -----------------------------
@@ -25,7 +30,7 @@ class BlogState(TypedDict):
     outline: str
     content: str
     refined_content: str
-    approval_status: str  # "pending", "approved", "rejected"
+    approval_status: str
     rejection_reason: str
 
 # -----------------------------
@@ -112,14 +117,14 @@ def human_approval_node(state: BlogState) -> BlogState:
 
 def finalize_approved(state: BlogState) -> BlogState:
     """Final node for approved blogs"""
-    print(f"[FINAL] ✓ Blog APPROVED: '{state['title']}'")
+    print(f"[FINAL] Blog APPROVED: '{state['title']}'")
     return state
 
 
 def handle_rejection(state: BlogState) -> BlogState:
     """Handle rejected blogs"""
     reason = state.get('rejection_reason', 'No reason provided')
-    print(f"[FINAL] ✗ Blog REJECTED: '{state['title']}'")
+    print(f"[FINAL] Blog REJECTED: '{state['title']}'")
     print(f"[FINAL] Rejection reason: {reason}")
     return state
 
@@ -139,7 +144,7 @@ def route_approval(state: BlogState) -> str:
         return "rejected"
     else:
         # This shouldn't happen if workflow is properly paused
-        print(f"[ROUTER] ⚠️ Unexpected status '{approval}'")
+        print(f"[ROUTER] Unexpected status '{approval}'")
         return "approved"
 
 
@@ -253,7 +258,7 @@ def generate_blog(topic: str, thread_id: str) -> dict:
     
     # Get current state to verify we're paused
     state = workflow.get_state(config)
-    print(f"\n[GENERATE] ✓ Workflow paused at checkpoint")
+    print(f"\n[GENERATE] Workflow paused at checkpoint")
     print(f"[GENERATE] Next node to execute: {state.next}")
     print(f"[GENERATE] Current approval status: {result.get('approval_status', 'pending')}")
     print(f"[GENERATE] Waiting for human decision via update_approval_status()...")
@@ -295,7 +300,7 @@ def update_approval_status(thread_id: str, action: str, rejection_reason: str = 
     print(f"[UPDATE] Verifying we're at human_approval checkpoint...")
     
     if current_state.next and "human_approval" not in str(current_state.next):
-        print(f"[UPDATE] ⚠️ Warning: Not at expected checkpoint. Next: {current_state.next}")
+        print(f"[UPDATE] Warning: Not at expected checkpoint. Next: {current_state.next}")
     
     # Prepare the update values based on action
     if action == "approve":
@@ -317,7 +322,7 @@ def update_approval_status(thread_id: str, action: str, rejection_reason: str = 
     
     # Verify the update
     updated_state = workflow.get_state(config)
-    print(f"[UPDATE] ✓ State updated successfully")
+    print(f"[UPDATE] State updated successfully")
     print(f"[UPDATE] Next nodes to execute: {updated_state.next}")
     print(f"[UPDATE] Updated approval_status: {updated_state.values.get('approval_status')}")
     
@@ -329,7 +334,7 @@ def update_approval_status(thread_id: str, action: str, rejection_reason: str = 
     
     # Get final state
     final_state = workflow.get_state(config)
-    print(f"\n[RESUME] ✓ Workflow completed")
+    print(f"\n[RESUME] Workflow completed")
     print(f"[RESUME] Final next nodes: {final_state.next}")
     print(f"[RESUME] Final approval status: {result.get('approval_status')}")
     print(f"{'='*60}\n")
@@ -368,4 +373,3 @@ def get_blog_state(thread_id: str) -> dict:
         "next_nodes": next_nodes,
         "thread_id": thread_id
     }
-

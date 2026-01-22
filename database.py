@@ -1,7 +1,8 @@
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.parse import quote_plus
 import enum
 import os
 from dotenv import load_dotenv
@@ -11,19 +12,19 @@ load_dotenv()
 
 # Get database credentials from .env
 DB_NAME = os.getenv("DATABASE", "blog_db")
-DB_USER = "root"
+DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("PASSWORD", "abcd@1234")
-DB_HOST = "localhost"
-DB_PORT = "3306"
+DB_HOST = os.getenv("DB_HOST", "mysql")
+DB_PORT = os.getenv("DB_PORT", "3306")
 
-# Fixed database URL format
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_PASSWORD_ENCODED = quote_plus(DB_PASSWORD)
 
+# Database URL format
+# DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD_ENCODED}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 print(f"Connecting to database: {DB_NAME} at {DB_HOST}")
 
-# CRITICAL FIX: Set echo=False to stop excessive SQL logging
-# Only enable echo in development for debugging
-engine = create_engine(DATABASE_URL, echo=False)  # Changed from echo=True
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20, pool_recycle=3600, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -40,13 +41,12 @@ class BlogPost(Base):
     topic = Column(String(255), nullable=False)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=False)
-    status = Column(Enum(ApprovalStatus), default=ApprovalStatus.PENDING, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(Enum(ApprovalStatus, native_enum=False, length=20), default=ApprovalStatus.PENDING, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
     approved_at = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
 
 def init_db():
-    print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully!")
 

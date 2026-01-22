@@ -1,0 +1,127 @@
+# Project name will group all containers together
+name: bloggeneration
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: blog_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PASSWORD:-abcd@1234}
+      MYSQL_PASSWORD: ${PASSWORD:-abcd@1234}
+      MYSQL_DATABASE: ${DATABASE:-blog_db}
+      MYSQL_USER: blog_user
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - blog_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${PASSWORD:-abcd@1234}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: blog_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - blog_network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # FastAPI Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database Configuration
+      DATABASE: ${DATABASE:-blog_db}
+      PASSWORD: ${PASSWORD:-abcd@1234}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      
+      # LangChain Configuration
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-true}
+      LANGCHAIN_ENDPOINT: ${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-BlogGeneration}
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: http://ollama:11434
+      
+      # Application Configuration
+      DEBUG: ${DEBUG:-false}
+      MAX_CONCURRENT_GENERATIONS: ${MAX_CONCURRENT_GENERATIONS:-5}
+    volumes:
+      # Mount for SQLite checkpoint database persistence
+      - checkpoint_data:/app/data
+      # Mount .env file (optional, if you want to use it)
+      - ./.env:/app/.env:ro
+    networks:
+      - blog_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Ollama Model Downloader (runs once to pull the model)
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: blog_ollama_pull
+    networks:
+      - blog_network
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      echo 'Waiting for Ollama to be ready...' &&
+      sleep 10 &&
+      echo 'Pulling qwen2.5:0.5b model...' &&
+      ollama pull qwen2.5:0.5b &&
+      echo 'Model pulled successfully!'
+      "
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    restart: "no"
+
+networks:
+  blog_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  ollama_data:
+    driver: local
+  checkpoint_data:
+    driver: local
+
