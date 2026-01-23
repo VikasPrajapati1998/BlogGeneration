@@ -757,7 +757,7 @@ For issues, questions, or feature requests:
 
 1. Check the [Troubleshooting](https://github.com/VikasPrajapati1998/BlogGeneration/issues) section
 2. Review [PROJECT.md](PROJECT.md) for detailed architecture
-3. Search existing [GitHub Issues](https://github.com/your-repo/issues)
+3. Search existing [GitHub Issues](issues)
 4. Open a new issue with detailed information
 
 ---
