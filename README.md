@@ -1,338 +1,450 @@
-# AI Blog Generator with Human-in-the-Loop Approval
+# AI Blog Generator with Human-in-the-Loop
 
-A complete blog generation application using LangChain, LangGraph, FastAPI, and MySQL with a **Human-in-the-Loop (HITL)** approval workflow powered by SQLite checkpointing.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128.0-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.0.5-4285F4.svg?style=flat)](https://langchain-ai.github.io/langgraph/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat&logo=Docker&logoColor=white)](https://www.docker.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+> A production-ready AI blog generation system with Human-in-the-Loop approval workflow, powered by LangGraph checkpointing and multi-agent orchestration.
 
-- **Multi-Agent Blog Generation**: Uses LangGraph with 4 specialized agents:
-  - Research Agent: Creates blog outlines
-  - Title Agent: Generates engaging titles
-  - Writer Agent: Writes comprehensive content
-  - Editor Agent: Refines and polishes the content
+## 🌟 Key Features
 
-- **Human-in-the-Loop (HITL) Workflow**: 
-  - **Workflow Interruption**: Generation pauses at human approval checkpoint
-  - **SQLite Checkpointing**: Persistent state management across sessions
-  - **State Resumption**: Workflow continues after human decision
-  - **Dual Database**: SQLite for workflow state, MySQL for blog storage
-  - All generated blogs start in "PENDING" status
-  - Human reviewers can approve or reject blogs
-  - Rejection reasons are tracked and stored
-  - Approval timestamps recorded
-  - Filter blogs by status (Pending/Approved/Rejected)
+### 🤖 **Multi-Agent Architecture**
+- **Research Agent**: Analyzes topics and creates structured outlines
+- **Title Agent**: Generates SEO-friendly, engaging headlines
+- **Writer Agent**: Produces comprehensive, well-structured content
+- **Editor Agent**: Refines and polishes for publication quality
 
-- **Real-time Statistics Dashboard**: 
-  - Total blogs count
-  - Pending approvals
-  - Approved blogs
-  - Rejected blogs
+### ⏸️ **Human-in-the-Loop Workflow**
+- **Intelligent Checkpointing**: Workflow pauses at human approval stage using SQLite persistence
+- **State Resumption**: Seamlessly continues after human decision
+- **Dual Database Architecture**: Separate workflow state (SQLite) and business data (MySQL)
+- **Thread-Based Isolation**: Multiple concurrent workflows without interference
+- **Approval Management**: Track approvals, rejections, and reasons with timestamps
 
-- **FastAPI Backend**: RESTful API with MySQL database
-- **Responsive Frontend**: Clean HTML/CSS/JavaScript interface
-- **Full CRUD Operations**: Create, read, update approval status, and delete blog posts
+### 📊 **Real-Time Dashboard**
+- Live statistics (Total, Pending, Approved, Rejected)
+- Status-based filtering (All, Pending, Approved, Rejected)
+- Instant approval/rejection workflow
+- Responsive, modern UI
 
-## Project Structure
+### 🐳 **Docker Ready**
+- Complete containerization with Docker Compose
+- MySQL, Ollama, and application services orchestrated
+- Health checks and automatic restart policies
+- Production-ready configuration
+
+## 📋 Table of Contents
+
+- [Architecture](#-architecture)
+- [Quick Start](#-quick-start)
+  - [Docker Deployment](#option-1-docker-recommended)
+  - [Local Development](#option-2-local-development)
+- [How It Works](#-how-it-works)
+- [API Documentation](#-api-documentation)
+- [Configuration](#-configuration)
+- [Database Schemas](#-database-schemas)
+- [Troubleshooting](#-troubleshooting)
+- [Development](#-development)
+- [Production Deployment](#-production-deployment)
+
+## 🏗️ Architecture
 
 ```
-blog_generation/
-├── main.py              # FastAPI application with approval endpoints
-├── database.py          # MySQL database models with approval status
-├── blog_agents.py       # LangGraph HITL workflow and agents
-├── setup_database.py    # MySQL database setup script
-├── requirements.txt     # Python dependencies
-├── .env                 # Environment variables
-├── blog_workflow.db     # SQLite checkpoint database (auto-created)
-├── static/
-│   ├── index.html      # Frontend UI with approval interface
-│   ├── style.css       # Styling with status badges
-│   └── script.js       # JavaScript logic with review functions
-└── README.md           # This file
+┌──────────────────────────────────────────────────────────┐
+│                    Frontend (HTML/CSS/JS)                │
+│  • Blog Generation Interface  • Approval Dashboard       │
+│  • Real-time Statistics       • Status Filtering         │
+└────────────────────┬─────────────────────────────────────┘
+                     │ REST API
+                     ↓
+┌──────────────────────────────────────────────────────────┐
+│              FastAPI Backend (main.py)                   │
+│  • Blog Generation Endpoints  • Approval Workflow        │
+│  • Background Tasks           • State Management         │
+└─────────┬────────────────────────┬───────────────────────┘
+          │                        │
+          ↓                        ↓
+┌─────────────────────┐   ┌─────────────────────────────┐
+│  MySQL (blog_db)    │   │  LangGraph Workflow         │
+│                     │   │  (blog_agents.py)           │
+│  • Blog Posts       │   │                             │
+│  • Approval Status  │   │  ┌───────────────────────┐  │
+│  • Timestamps       │   │  │ Research → Title →    │  │
+│  • Rejection Reasons│   │  │ Writer → Editor →     │  │
+└─────────────────────┘   │  │ [CHECKPOINT] →        │  │
+                          │  │ Human Approval →      │  │
+                          │  │ Finalize              │  │
+                          │  └───────────────────────┘  │
+                          │           ↕                 │
+                          │  ┌───────────────────────┐  │
+                          │  │ SQLite Checkpointer   │  │
+                          │  │ (blog_workflow.db)    │  │
+                          │  │ • Workflow States     │  │
+                          │  │ • Thread Isolation    │  │
+                          │  └───────────────────────┘  │
+                          │           ↕                 │
+                          │  ┌───────────────────────┐  │
+                          │  │ Ollama LLM            │  │
+                          │  │ (qwen2.5:0.5b)        │  │
+                          │  └───────────────────────┘  │
+                          └─────────────────────────────┘
 ```
 
-## Prerequisites
+### Thread-Based State Management
 
-1. **Python 3.8+**
-2. **MySQL Server** running on localhost
-3. **Ollama** with qwen2.5:0.5b model installed
+```
+┌─────────────────────────────────────────────────────────┐
+│  Blog Generation Request                                │
+│  ↓                                                      │
+│  Generate unique thread_id: "blog_abc123"               │
+│  ↓                                                      │
+│  ┌───────────────┐          ┌──────────────────┐        │
+│  │ MySQL Record  │←────────→│ SQLite Checkpoint│        │
+│  │ id: 1         │ thread_id│ thread_id:       │        │
+│  │ thread_id:    │          │ "blog_abc123"    │        │
+│  │ "blog_abc123" │          │ state: {...}     │        │
+│  │ status: PEND. │          │ next: ["human_   │        │
+│  └───────────────┘          │       approval"] │        │
+│                             └──────────────────┘        │
+│                                                         │
+│  Human Decision → Update SQLite → Resume Workflow       │
+│                                                         │
+│  ┌───────────────┐          ┌──────────────────┐        │
+│  │ MySQL Record  │          │ SQLite Checkpoint│        │
+│  │ status: APPROV│          │ state: updated   │        │
+│  │ approved_at:  │          │ next: []         │        │
+│  │ timestamp     │          │ (completed)      │        │
+│  └───────────────┘          └──────────────────┘        │
+└─────────────────────────────────────────────────────────┘
+```
 
-### Install Ollama and Model
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Docker & Docker Compose** (for containerized deployment)
+- **OR** Python 3.8+, MySQL, and Ollama (for local development)
+
+### Option 1: Docker (Recommended)
+
+The fastest way to get started with everything pre-configured:
 
 ```bash
-# Install Ollama (if not already installed)
-# Visit: https://ollama.ai
+# Clone the repository
+git clone https://github.com/VikasPrajapati1998/BlogGeneration.git
+cd BlogGeneration
 
-# Pull the model
-ollama pull qwen2.5:0.5b  # Faster, smaller
-# OR
-ollama pull llama3.2:1b   # Better quality
+# Create .env file (copy from .env.example or create new)
+cat > .env << EOF
+# Database
+DATABASE=blog_db
+PASSWORD=''
+MYSQL_ROOT_PASSWORD=''
+
+# LangChain (optional - for tracing)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_api_key_here
+LANGCHAIN_PROJECT=BlogGeneration
+
+# Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+EOF
+
+# Start all services
+docker-compose up -d
+
+# Wait for Ollama model download (first time only)
+docker-compose logs -f ollama-pull
+
+# Access application
+# Open browser: http://localhost:8000
 ```
 
-## Setup Instructions
+**What happens:**
+1. MySQL database starts on port 3307
+2. Ollama server starts and downloads `qwen2.5:0.5b` model (~500MB)
+3. FastAPI application starts on port 8000
+4. All services health-checked and connected
 
-### 1. Clone/Create Project Structure
+**Manage services:**
+```bash
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up --build -d
+
+# View service status
+docker-compose ps
+```
+
+### Option 2: Local Development
+
+For development with hot reload:
 
 ```bash
-mkdir blog_generation
-cd blog_generation
+# 1. Install dependencies
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-# Create static folder
-mkdir static
+# 2. Setup MySQL
+mysql -u root -p
+CREATE DATABASE blog_db;
+# OR run: python setup_database.py
 
-# Copy all files to respective locations:
-# - main.py, database.py, blog_agents.py, setup_database.py, .env in root
-# - index.html, style.css, script.js in static/
+# 3. Install and start Ollama
+# Download from: https://ollama.ai
+ollama serve
+ollama pull qwen2.5:0.5b
+
+# 4. Configure environment
+# Create .env file with your MySQL credentials
+
+# 5. Run application
+python main.py
+
+# Access: http://localhost:8000
 ```
 
-### 2. Configure Environment Variables
+## 🎯 How It Works
 
-Create a `.env` file in the root directory:
+### The HITL Workflow
+
+Our system implements a **three-phase Human-in-the-Loop pattern**:
+
+#### **Phase 1: Generation (Before Human)**
+
+```
+User submits topic → LangGraph workflow starts
+     ↓
+Research Agent → Creates outline
+     ↓
+Title Agent → Generates title
+     ↓
+Writer Agent → Writes content
+     ↓
+Editor Agent → Refines content
+     ↓
+[CHECKPOINT] → Workflow PAUSES
+     ↓
+State saved to SQLite (blog_workflow.db)
+Blog saved to MySQL with status=PENDING
+```
+
+**Console Output:**
+```
+[GENERATE] Starting blog generation (STEP 1: Before Human)
+[AGENT] Research Agent: Creating outline...
+[AGENT] Title Agent: Generating title...
+[AGENT] Writer Agent: Writing blog...
+[AGENT] Editor Agent: Refining content...
+[GENERATE] ✓ Workflow paused at checkpoint
+[GENERATE] Waiting for human decision...
+```
+
+#### **Phase 2: Human Decision**
+
+Human reviewer examines the generated content and makes a decision:
+- **Approve**: Content is ready for publication
+- **Reject**: Content needs improvement (with reason)
+
+#### **Phase 3: Resumption (After Human)**
+
+```
+Human decision → Update SQLite checkpoint
+     ↓
+workflow.update_state(as_node="human_approval")
+     ↓
+Workflow resumes from checkpoint
+     ↓
+Router checks approval_status
+     ↓
+If approved → finalize_approved node
+If rejected → handle_rejection node
+     ↓
+Final status saved to MySQL
+Workflow completes
+```
+
+**Console Output:**
+```
+[UPDATE] Human decision received
+[UPDATE] Calling update_state(as_node='human_approval')...
+[RESUME] Resuming workflow execution
+[ROUTER] Routing to APPROVED path
+[FINAL] ✓ Blog APPROVED
+[RESUME] ✓ Workflow completed
+```
+
+### Why Dual Databases?
+
+**SQLite (blog_workflow.db):**
+- Manages LangGraph workflow state
+- Stores checkpoints for pause/resume
+- Handles thread-based isolation
+- Persists across server restarts
+- Auto-managed by LangGraph
+
+**MySQL (blog_db):**
+- Stores final blog posts
+- Tracks approval status and timestamps
+- Manages rejection reasons
+- Optimized for queries and filtering
+- User-facing data
+
+**The Bridge:** `thread_id` links both databases, enabling workflow resumption after human decisions.
+
+## 📚 API Documentation
+
+### Blog Generation
+
+**Create Blog (Initiates HITL Workflow)**
+```http
+POST /api/generate
+Content-Type: application/json
+
+{
+  "topic": "Future of Artificial Intelligence"
+}
+
+Response:
+{
+  "id": 1,
+  "thread_id": "blog_abc123",
+  "topic": "Future of Artificial Intelligence",
+  "title": "Generating...",
+  "content": "Blog generation in progress...",
+  "status": "pending",
+  "created_at": "2026-01-23T10:30:00",
+  "approved_at": null,
+  "rejection_reason": null
+}
+```
+
+### Blog Retrieval
+
+```http
+# Get all blogs
+GET /api/blogs
+
+# Filter by status
+GET /api/blogs?status=pending
+GET /api/blogs?status=approved
+GET /api/blogs?status=rejected
+
+# Get specific blog
+GET /api/blogs/{id}
+
+# Get workflow state
+GET /api/blogs/{id}/state
+Response:
+{
+  "approval_status": "pending",
+  "next_nodes": ["human_approval"],
+  "thread_id": "blog_abc123",
+  ...
+}
+```
+
+### Blog Review (HITL Decision)
+
+**Approve Blog**
+```http
+POST /api/blogs/{id}/review
+Content-Type: application/json
+
+{
+  "action": "approve"
+}
+
+Response:
+{
+  "id": 1,
+  "status": "approved",
+  "approved_at": "2026-01-23T11:45:00",
+  ...
+}
+```
+
+**Reject Blog**
+```http
+POST /api/blogs/{id}/review
+Content-Type: application/json
+
+{
+  "action": "reject",
+  "rejection_reason": "Needs more specific examples and data"
+}
+
+Response:
+{
+  "id": 1,
+  "status": "rejected",
+  "rejection_reason": "Needs more specific examples and data",
+  ...
+}
+```
+
+### Statistics
+
+```http
+GET /api/stats
+
+Response:
+{
+  "total": 15,
+  "pending": 3,
+  "approved": 10,
+  "rejected": 2
+}
+```
+
+### Health Check
+
+```http
+GET /health
+
+Response:
+{
+  "status": "healthy",
+  "langchain_project": "BlogGeneration",
+  "database": "blog_db"
+}
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root:
 
 ```env
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_ENDPOINT='https://api.smith.langchain.com'
-LANGCHAIN_API_KEY='your_langchain_api_key_here'
-LANGCHAIN_PROJECT='BlogGeneration'
-
+# Database Configuration
 DATABASE=blog_db
-USER=localhost
-PASSWORD=your_mysql_password_here
+PASSWORD=your_secure_password
+MYSQL_ROOT_PASSWORD=your_secure_password
+DB_HOST=localhost  # Use "mysql" for Docker
+DB_PORT=3306       # Use "3307" if running MySQL in Docker
+DB_USER=root
+
+# LangChain Configuration (Optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+LANGCHAIN_API_KEY=your_langsmith_api_key
+LANGCHAIN_PROJECT=BlogGeneration
+
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434  # http://ollama:11434 in Docker
+
+# Application Configuration
+DEBUG=false
+MAX_CONCURRENT_GENERATIONS=5
 ```
-
-### 3. Install Dependencies
-
-```bash
-# Create virtual environment (recommended)
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install packages
-pip install -r requirements.txt
-```
-
-**Required packages include:**
-- `langgraph` - Graph orchestration
-- `langgraph-checkpoint-sqlite` - SQLite state persistence for HITL
-- `langchain` and `langchain-community` - LLM integration
-- `fastapi` and `uvicorn` - Web framework
-- `sqlalchemy` and `pymysql` - MySQL ORM
-- `python-dotenv` - Environment management
-
-### 4. Setup MySQL Database
-
-```bash
-# Run the database setup script
-python setup_database.py
-```
-
-This will create the `blog_db` database with the necessary tables including approval status fields.
-
-### 5. Run the Application
-
-```bash
-# Make sure Ollama is running
-ollama serve
-
-# In another terminal, run the FastAPI app
-python main.py
-```
-
-The application will be available at: **http://localhost:8000**
-
-**Note:** On first run, `blog_workflow.db` (SQLite checkpoint database) will be automatically created for HITL state management.
-
-## Usage
-
-### 1. Generate a Blog
-
-1. Enter a topic in the input field
-2. Click "Generate Blog"
-3. Wait for the AI agents to create your content (30-60 seconds)
-4. **HITL Checkpoint**: Workflow pauses automatically at human approval
-5. The generated blog will appear with **PENDING** status
-6. Review buttons (Approve/Reject) will be available
-
-### 2. Review and Approve Blogs
-
-**From the Generated Blog View:**
-- Click "✓ Approve Blog" to approve
-- Click "✗ Reject Blog" to reject (requires reason)
-
-**From the Blog List:**
-- Each pending blog has "Approve" and "Reject" buttons
-- Click to review directly from the list
-- Approved blogs show approval timestamp
-- Rejected blogs show rejection reason
-
-**What happens during approval:**
-1. Your decision updates the workflow checkpoint in SQLite
-2. The workflow resumes from the paused state
-3. Routes to approval or rejection handler
-4. Final status is saved to MySQL database
-
-### 3. Filter Blogs by Status
-
-Use the filter tabs to view:
-- **All**: All blogs regardless of status
-- **Pending**: Blogs awaiting approval (paused at HITL checkpoint)
-- **Approved**: Approved blogs ready for publishing
-- **Rejected**: Rejected blogs with reasons
-
-### 4. Monitor Statistics
-
-The dashboard shows real-time counts:
-- Total blogs generated
-- Pending approvals (workflows paused at checkpoint)
-- Approved blogs
-- Rejected blogs
-
-### 5. API Endpoints
-
-**Blog Generation:**
-- `POST /api/generate` - Generate new blog (creates with PENDING status, pauses at HITL checkpoint)
-
-**Blog Retrieval:**
-- `GET /api/blogs` - Get all blogs
-- `GET /api/blogs?status=pending` - Get pending blogs
-- `GET /api/blogs?status=approved` - Get approved blogs
-- `GET /api/blogs?status=rejected` - Get rejected blogs
-- `GET /api/blogs/{id}` - Get specific blog
-- `GET /api/blogs/{id}/state` - Get workflow state for a blog
-
-**Blog Review:**
-- `POST /api/blogs/{id}/review` - Approve or reject a blog (resumes workflow from checkpoint)
-  ```json
-  // Approve
-  {"action": "approve"}
-  
-  // Reject
-  {"action": "reject", "rejection_reason": "Needs more detail"}
-  ```
-
-**Blog Management:**
-- `DELETE /api/blogs/{id}` - Delete blog
-
-**Statistics:**
-- `GET /api/stats` - Get approval statistics
-- `GET /health` - Health check
-
-## How It Works - HITL Pattern
-
-### LangGraph Workflow with HITL
-
-The blog generation follows this workflow with a **Human-in-the-Loop checkpoint**:
-
-```
-Research → Title → Writer → Editor → [CHECKPOINT] → Human Review → Approved/Rejected
-```
-
-**Phase 1: Generation (Before Human)**
-1. **Research Agent**: Analyzes the topic and creates a structured outline
-2. **Title Agent**: Generates an SEO-friendly, engaging title
-3. **Writer Agent**: Writes comprehensive content based on the outline
-4. **Editor Agent**: Reviews and refines the content for clarity and quality
-5. **Checkpoint**: Workflow pauses with `interrupt_before=["human_approval"]`
-6. **State Saved**: Current state saved to `blog_workflow.db` (SQLite)
-7. **Status**: Blog saved to MySQL with PENDING status
-
-**Phase 2: Human Decision**
-1. Human reviewer examines the generated content
-2. Makes decision: Approve or Reject
-3. Frontend calls `/api/blogs/{id}/review` endpoint
-4. Backend updates workflow state using `update_state(as_node="human_approval")`
-
-**Phase 3: Workflow Resumption (After Human)**
-1. Workflow automatically resumes from checkpoint
-2. Routes based on approval_status:
-   - If approved → `finalize_approved` node
-   - If rejected → `handle_rejection` node
-3. Final status saved to MySQL database
-4. Workflow completes
-
-### Dual Database Architecture
-
-```
-┌─────────────────────────────────────────┐
-│         blog_workflow.db (SQLite)       │
-│  - Workflow checkpoints                 │
-│  - Intermediate states                  │
-│  - Thread-based state management        │
-│  - Auto-created and managed by LangGraph│
-└─────────────────────────────────────────┘
-                    │
-                    │ State persistence
-                    ↓
-┌─────────────────────────────────────────┐
-│         blog_db (MySQL)                 │
-│  - Final blog posts                     │
-│  - Approval status                      │
-│  - Timestamps                           │
-│  - Rejection reasons                    │
-└─────────────────────────────────────────┘
-```
-
-**Why Two Databases?**
-- **SQLite (blog_workflow.db)**: Handles workflow state, checkpoints, and resumption
-- **MySQL (blog_db)**: Stores final blog posts and approval metadata
-- **Separation of Concerns**: Workflow logic separate from business data
-- **Persistence**: Workflow survives server restarts
-
-### Checkpoint Management
-
-Each blog generation creates a unique **thread_id** (e.g., `blog_abc123`):
-- Thread ID links SQLite checkpoint to MySQL blog record
-- Enables workflow resumption after server restart
-- Allows multiple concurrent blog generations
-- State isolated per thread
-
-### Agent Communication
-
-Each agent receives the state from the previous agent and adds its contribution:
-- State contains: `topic`, `title`, `outline`, `content`, `refined_content`, `approval_status`
-- Agents pass the enriched state through the workflow
-- State checkpointed at human approval node
-- Final output saved to MySQL after human decision
-
-## Database Schemas
-
-### MySQL Database (blog_db)
-
-#### BlogPost Table
-
-```sql
-CREATE TABLE blog_posts (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    thread_id VARCHAR(255) UNIQUE NOT NULL,  -- Links to SQLite checkpoint
-    topic VARCHAR(255) NOT NULL,
-    title VARCHAR(500) NOT NULL,
-    content TEXT NOT NULL,
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    approved_at DATETIME NULL,
-    rejection_reason TEXT NULL
-);
-```
-
-### SQLite Database (blog_workflow.db)
-
-**Auto-managed by LangGraph, contains:**
-- `checkpoints` table: Workflow states indexed by thread_id
-- `checkpoint_writes` table: State update history
-- Internal LangGraph checkpoint schema
-
-**You can inspect it with:**
-```bash
-sqlite3 blog_workflow.db
-.tables
-.schema checkpoints
-SELECT * FROM checkpoints;
-```
-
-## Configuration
 
 ### Change LLM Model
 
@@ -340,312 +452,317 @@ Edit `blog_agents.py`:
 
 ```python
 llm = ChatOllama(
-    model="qwen2.5:0.5b",  # Change to: llama3.2:1b, mistral:latest, etc.
+    model="qwen2.5:0.5b",  # Options: llama3.2:1b, mistral:latest, etc.
     temperature=0.7,
+    base_url=OLLAMA_BASE_URL,
 )
 ```
 
-**Recommended Models:**
-- `qwen2.5:0.5b` - Fastest (20-30 seconds)
-- `llama3.2:1b` - Balanced (40-60 seconds)
-- `mistral:latest` - Best quality (60-90 seconds)
+**Model Comparison:**
 
-### Change Database Settings
+|      Model     |        Speed        |        Quality         |    Size    |    Recommended For    |
+|----------------|---------------------|------------------------|------------|-----------------------|
+| qwen2.5:0.5b   | ⚡⚡⚡ Fast (18s) | ⭐⭐⭐ Good           |  500MB     | Development, Testing  |
+| llama3.2:1b    | ⚡⚡ Medium (33s)  | ⭐⭐⭐⭐ Great       |  1GB       | Balanced Use          |
+| mistral:latest | ⚡ Slow (53s)      | ⭐⭐⭐⭐⭐ Excellent |  4GB       | Production            |
 
-Edit `.env` file:
+## 🗄️ Database Schemas
+
+### MySQL: `blog_posts`
+
+```sql
+CREATE TABLE blog_posts (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    thread_id VARCHAR(255) UNIQUE NOT NULL,
+    topic VARCHAR(255) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    approved_at DATETIME NULL,
+    rejection_reason TEXT NULL,
+    
+    INDEX idx_thread_id (thread_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+);
+```
+
+### SQLite: `checkpoints` (Auto-managed by LangGraph)
+
+```
+Stores:
+- thread_id (links to MySQL)
+- workflow state (topic, title, content, etc.)
+- next_nodes (current position in workflow)
+- checkpoint metadata
+
+Inspect with:
+sqlite3 blog_workflow.db
+SELECT thread_id, checkpoint_ns FROM checkpoints;
+```
+
+## 🔧 Troubleshooting
+
+### Docker Issues
+
+**Services not starting:**
+```bash
+# Check logs
+docker-compose logs
+
+# Restart specific service
+docker-compose restart app
+
+# Rebuild from scratch
+docker-compose down -v
+docker-compose up --build
+```
+
+**Port conflicts:**
+```bash
+# Check what's using ports
+netstat -ano | findstr :8000    # Windows
+lsof -i :8000                   # Mac/Linux
+
+# Change ports in docker-compose.yml if needed
+```
+
+**Ollama model not loading:**
+```bash
+# Check Ollama container
+docker-compose logs ollama
+
+# Manually pull model
+docker-compose exec ollama ollama pull qwen2.5:0.5b
+
+# Verify model exists
+docker-compose exec ollama ollama list
+```
+
+### Workflow Issues
+
+**Workflow not pausing:**
+```python
+# Verify in blog_agents.py:
+compiled = workflow.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["human_approval"]  # Must be present
+)
+
+# Check console for:
+[GENERATE] ✓ Workflow paused at checkpoint
+```
+
+**Workflow not resuming:**
+```bash
+# Check thread_id consistency
+# MySQL:
+SELECT id, thread_id, status FROM blog_posts;
+
+# SQLite:
+sqlite3 blog_workflow.db
+SELECT thread_id FROM checkpoints;
+
+# Thread IDs must match!
+```
+
+**State update fails:**
+```
+Verify:
+1. Correct thread_id used
+2. as_node="human_approval" specified
+3. approval_status value is "approved" or "rejected"
+4. Checkpoint exists in SQLite
+```
+
+### Database Connection
+
+**MySQL connection failed:**
+```bash
+# Test connection
+mysql -u root -p -h localhost -P 3307
+
+# For Docker:
+docker-compose exec mysql mysql -u root -p
+
+# Check credentials in .env match docker-compose.yml
+```
+
+**SQLite locked:**
+```python
+# Ensure check_same_thread=False in blog_agents.py:
+conn = sqlite3.connect(
+    "blog_workflow.db",
+    check_same_thread=False  # Critical for multi-process
+)
+```
+
+## 💻 Development
+
+### Project Structure
+
+```
+BlogGeneration/
+├── main.py                 # FastAPI application
+├── blog_agents.py          # LangGraph HITL workflow
+├── database.py             # MySQL models & connection
+├── setup_database.py       # Database initialization
+├── requirements.txt        # Python dependencies
+├── docker-compose.yml      # Docker orchestration
+├── Dockerfile              # Application container
+├── .env                    # Environment configuration
+├── .dockerignore           # Docker build exclusions
+├── init.sql                # MySQL initialization
+├── blog_workflow.db        # SQLite checkpoints (auto-created)
+├── static/
+│   ├── index.html         # Frontend UI
+│   ├── style.css          # Styling
+│   └── script.js          # Client-side logic
+└── docs/
+    ├── PROJECT.md         # Detailed architecture docs
+    ├── DOCKER_README.md   # Docker setup guide
+    └── README.md          # This file
+```
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio httpx
+
+# Run tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=. --cov-report=html
+```
+
+### Code Quality
+
+```bash
+# Format code
+black *.py
+
+# Lint code
+flake8 *.py
+
+# Type checking
+mypy *.py
+```
+
+## 🚀 Production Deployment
+
+### Environment Configuration
 
 ```env
-DATABASE=blog_db
-PASSWORD=your_mysql_password
+# Production .env
+DEBUG=false
+MAX_CONCURRENT_GENERATIONS=10
+
+# Use strong passwords
+PASSWORD=<strong_random_password>
+MYSQL_ROOT_PASSWORD=<strong_random_password>
+
+# Configure allowed origins
+ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 ```
 
-Or directly edit `database.py`:
-
-```python
-DATABASE_URL = "mysql+pymysql://root:YOUR_PASSWORD@localhost/blog_db"
-```
-
-## Troubleshooting
-
-**Database Connection Error (MySQL):**
-- Verify MySQL is running: `mysql -u root -p`
-- Check username/password in `.env` file
-- Ensure `blog_db` database exists
-- Run `python setup_database.py` to recreate
-
-**Checkpoint Database Issues:**
-- `blog_workflow.db` is auto-created by LangGraph
-- If corrupted, delete it and restart server
-- Each thread_id creates one checkpoint entry
-- Database uses `check_same_thread=False` for multi-process access
-
-**Workflow Not Pausing:**
-- Check console logs for `[GENERATE] ✓ Workflow paused at checkpoint`
-- Verify `interrupt_before=["human_approval"]` in `blog_agents.py`
-- Ensure `langgraph-checkpoint-sqlite` is installed
-- Check LangGraph version: `pip show langgraph`
-
-**Workflow Not Resuming:**
-- Verify thread_id matches between MySQL and SQLite
-- Check console logs for `[RESUME] Resuming workflow execution`
-- Ensure `update_state(as_node="human_approval")` is called
-- Check for errors in workflow state
-
-**Ollama Connection Error:**
-- Make sure Ollama is running: `ollama serve`
-- Verify model is installed: `ollama list`
-- Pull model if missing: `ollama pull qwen2.5:0.5b`
-
-**Generation Takes Too Long:**
-- Use a smaller model (qwen2.5:0.5b) for faster results
-- Check Ollama server load: `ollama ps`
-- Ensure sufficient RAM/CPU resources
-
-**Approval Status Not Updating:**
-- Check browser console for JavaScript errors
-- Verify API endpoint is accessible: `http://localhost:8000/api/stats`
-- Check if workflow checkpoint exists in SQLite
-- Clear browser cache and reload
-
-**Stats Not Refreshing:**
-- Stats auto-refresh every 30 seconds
-- Click "Refresh" button to manually update
-- Check network tab for failed requests
-
-## Verification Steps
-
-After setup, verify HITL is working:
-
-1. **Check Console Logs During Generation:**
-   ```
-   [GENERATE] Starting blog generation (STEP 1: Before Human)
-   [AGENT] Research Agent: Creating outline...
-   [AGENT] Title Agent: Generating title...
-   [AGENT] Writer Agent: Writing blog...
-   [AGENT] Editor Agent: Refining content...
-   [GENERATE] ✓ Workflow paused at checkpoint
-   [GENERATE] Next node to execute: ('human_approval',)
-   [GENERATE] Waiting for human decision...
-   ```
-
-2. **Check SQLite Database Created:**
-   ```bash
-   ls -la blog_workflow.db
-   ```
-
-3. **Verify Checkpoint on Approval:**
-   ```
-   [UPDATE] Human decision received (STEP 2: Human Input)
-   [UPDATE] Calling update_state(as_node='human_approval')...
-   [UPDATE] ✓ State updated successfully
-   [RESUME] Resuming workflow execution (STEP 3: After Human)
-   [ROUTER] Checking approval status: approved
-   [FINAL] ✓ Blog APPROVED
-   [RESUME] ✓ Workflow completed
-   ```
-
-## Advanced Features
-
-### Workflow State Inspection
-
-Get current workflow state for a blog:
+### Using Gunicorn
 
 ```bash
-curl http://localhost:8000/api/blogs/1/state
+# Install
+pip install gunicorn
+
+# Run with workers
+gunicorn main:app \
+  --workers 4 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000 \
+  --timeout 120 \
+  --access-logfile access.log \
+  --error-logfile error.log
 ```
 
-Response shows:
-- Current approval status
-- Next nodes to execute
-- Whether workflow is paused
+### Docker Production
 
-### Concurrent Workflows
-
-The HITL system supports multiple simultaneous blog generations:
-- Each has unique thread_id
-- Independent checkpoints in SQLite
-- No interference between workflows
-- All can pause at human approval independently
-
-### Server Restart Recovery
-
-**Workflow state persists across restarts:**
-1. Generate blog → workflow pauses
-2. Stop server (`Ctrl+C`)
-3. Restart server (`python main.py`)
-4. Approve/reject blog → workflow resumes correctly
-
-This works because:
-- SQLite checkpoint saved to disk
-- MySQL blog record preserved
-- thread_id links them together
-
-## Best Practices
-
-### HITL Workflow
-1. **Regular Checkpoint Review**: Monitor pending workflows in SQLite
-2. **Timely Reviews**: Don't leave workflows paused too long
-3. **Clear Rejection Reasons**: Helps improve future prompts
-4. **Workflow Monitoring**: Check console logs for checkpoint issues
-
-### Database Management
-1. **SQLite Cleanup**: Periodically remove old checkpoints
-2. **MySQL Archival**: Archive old approved/rejected blogs
-3. **Thread ID Tracking**: Keep thread_ids synchronized
-4. **Backup Both Databases**: Critical for recovery
-
-### Performance
-1. **Limit Concurrent Workflows**: Depends on server resources
-2. **Monitor Checkpoint Size**: SQLite grows with workflows
-3. **Optimize LLM Calls**: Smaller models for faster checkpoints
-
-## Future Enhancements
-
-### HITL Improvements
-- [ ] Multi-level approval (reviewer → editor → publisher)
-- [ ] Approval delegation and routing
-- [ ] Workflow timeout handling
-- [ ] Checkpoint cleanup automation
-- [ ] Workflow versioning
-
-### Core Features
-- [ ] Blog editing functionality for approved blogs
-- [ ] User authentication and role-based access
-- [ ] Bulk approve/reject operations
-- [ ] Blog versioning and revision history
-- [ ] Re-generation from rejected blogs
-
-### Content Features
-- [ ] Blog categories and tags
-- [ ] SEO score and optimization suggestions
-- [ ] Plagiarism checking
-- [ ] Export to PDF/Markdown/HTML
-- [ ] AI-generated images for blog posts
-- [ ] Scheduled publishing for approved blogs
-
-### Workflow Features
-- [ ] Email notifications for pending approvals
-- [ ] Approval deadline tracking with automatic timeout
-- [ ] Comment/feedback system for rejections
-- [ ] Approval analytics and reporting
-- [ ] Workflow visualization dashboard
-
-## API Response Examples
-
-### Generate Blog (Creates Checkpoint)
-
-**Request:**
 ```bash
-curl -X POST http://localhost:8000/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"topic": "Future of AI"}'
+# Build production image
+docker-compose -f docker-compose.yml build
+
+# Run with resource limits
+docker-compose up -d
+
+# Monitor
+docker stats blog_app blog_mysql blog_ollama
 ```
 
-**Response:**
-```json
-{
-  "id": 1,
-  "thread_id": "blog_abc123",
-  "topic": "Future of AI",
-  "title": "The Future of AI: Transforming Tomorrow",
-  "content": "...",
-  "status": "pending",
-  "created_at": "2026-01-22T10:30:00",
-  "approved_at": null,
-  "rejection_reason": null
-}
-```
+### Monitoring
 
-### Check Workflow State
-
-**Request:**
 ```bash
-curl http://localhost:8000/api/blogs/1/state
+# Application logs
+docker-compose logs -f app
+
+# Database logs
+docker-compose logs -f mysql
+
+# Resource usage
+docker stats
 ```
 
-**Response:**
-```json
-{
-  "topic": "Future of AI",
-  "title": "The Future of AI: Transforming Tomorrow",
-  "content": "...",
-  "approval_status": "pending",
-  "rejection_reason": "",
-  "next_nodes": ["human_approval"],
-  "thread_id": "blog_abc123"
-}
-```
+### Backup Strategy
 
-### Approve Blog (Resumes Workflow)
-
-**Request:**
 ```bash
-curl -X POST http://localhost:8000/api/blogs/1/review \
-  -H "Content-Type: application/json" \
-  -d '{"action": "approve"}'
+# Backup MySQL
+docker-compose exec -T mysql mysqldump -u root -p${PASSWORD} blog_db > backup_$(date +%Y%m%d).sql
+
+# Backup SQLite checkpoints
+cp blog_workflow.db backup_workflow_$(date +%Y%m%d).db
+
+# Restore
+cat backup.sql | docker-compose exec -T mysql mysql -u root -p${PASSWORD} blog_db
 ```
 
-**Response:**
-```json
-{
-  "id": 1,
-  "thread_id": "blog_abc123",
-  "topic": "Future of AI",
-  "title": "The Future of AI: Transforming Tomorrow",
-  "content": "...",
-  "status": "approved",
-  "created_at": "2026-01-22T10:30:00",
-  "approved_at": "2026-01-22T11:45:00",
-  "rejection_reason": null
-}
-```
+## 📖 Additional Resources
 
-### Reject Blog (Resumes Workflow)
+- **Detailed Architecture**: See [PROJECT.md](docs/PROJECT.md)
+- **Docker Guide**: See [DOCKER_README.md](docs/DOCKER_README.md)
+- **LangGraph Docs**: https://langchain-ai.github.io/langgraph/
+- **FastAPI Docs**: https://fastapi.tiangolo.com
+- **Ollama Models**: https://ollama.ai/library
 
-**Request:**
-```bash
-curl -X POST http://localhost:8000/api/blogs/1/review \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "reject",
-    "rejection_reason": "Content lacks depth and specific examples"
-  }'
-```
+## 🤝 Contributing
 
-**Response:**
-```json
-{
-  "id": 1,
-  "thread_id": "blog_abc123",
-  "topic": "Future of AI",
-  "title": "The Future of AI: Transforming Tomorrow",
-  "content": "...",
-  "status": "rejected",
-  "created_at": "2026-01-22T10:30:00",
-  "approved_at": null,
-  "rejection_reason": "Content lacks depth and specific examples"
-}
-```
+Contributions are welcome! Please:
 
-## Contributing
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 📄 License
 
-## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-MIT License - Feel free to use and modify for your projects!
+## 🙏 Acknowledgments
 
-## Support
+- **LangChain Team** for the excellent LangGraph framework
+- **FastAPI** for the modern, fast web framework
+- **Ollama** for local LLM deployment
+- **Community Contributors** for valuable feedback
 
-For issues or questions:
-1. Check the Troubleshooting section
-2. Review HITL verification steps
-3. Inspect `blog_workflow.db` for checkpoint issues
-4. Check Ollama and MySQL logs
-5. Open an issue on GitHub
+## 📞 Support
+
+For issues, questions, or feature requests:
+
+1. Check the [Troubleshooting](#-troubleshooting) section
+2. Review [PROJECT.md](docs/PROJECT.md) for detailed architecture
+3. Search existing [GitHub Issues](https://github.com/your-repo/issues)
+4. Open a new issue with detailed information
 
 ---
 
-**Built with ❤️ using LangChain, LangGraph, FastAPI, MySQL, and SQLite**
+**Built with ❤️ using LangChain, LangGraph, FastAPI, and Docker**
 
-**Powered by Human-in-the-Loop (HITL) pattern for production-ready AI workflows**
+**Powered by Vikas Prajapati for production-ready AI workflows**

@@ -1,564 +1,518 @@
-# Docker Setup for Windows - AI Blog Generator
+# Docker Deployment Guide
 
-## Prerequisites for Windows
+> Professional containerized deployment for AI Blog Generator with HITL workflow
 
-### 1. Install Docker Desktop for Windows
+## 🎯 Quick Start
 
-Download and install from: https://www.docker.com/products/docker-desktop/
+```bash
+# 1. Clone and configure
+git clone https://github.com/VikasPrajapati1998/BlogGeneration.git
+cd BlogGeneration
+cp .env.example .env  # Edit with your credentials
 
-**System Requirements:**
-- Windows 10/11 Pro, Enterprise, or Education (64-bit)
-- OR Windows 10/11 Home with WSL 2
-- Hyper-V and Containers Windows features enabled
-- At least 8GB RAM
+# 2. Deploy
+docker-compose up -d
 
-**Installation Steps:**
-1. Download Docker Desktop installer
-2. Run installer as Administrator
-3. Enable WSL 2 during installation (recommended)
-4. Restart computer when prompted
-5. Start Docker Desktop
-6. Verify installation:
-   ```powershell
-   docker --version
-   docker-compose --version
-   ```
+# 3. Verify
+docker-compose ps
+curl http://localhost:8000/health
 
-### 2. Verify Your Current Setup
-
-Based on your directory listing, you have:
-```
-✓ Python 3.11.9 in venv
-✓ All project files present
-✓ blog_workflow.db already created (626KB)
-✓ Static files present
+# Access: http://localhost:8000
 ```
 
-## Quick Start on Windows
+## 📦 Service Architecture
 
-### Step 1: Open PowerShell or Command Prompt
+```
+┌─────────────────────────────────────────────────┐
+│  Docker Compose Stack (bloggeneration)          │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  ┌──────────────┐  ┌──────────────┐             │
+│  │  blog_mysql  │  │  blog_ollama │             │
+│  │  Port: 3307  │  │  Port: 11434 │             │
+│  │  MySQL 8.0   │  │  LLM Server  │             │
+│  └──────┬───────┘  └──────┬───────┘             │
+│         │                 │                     │
+│         └────────┬────────┘                     │
+│                  ↓                              │
+│         ┌─────────────────┐                     │
+│         │   blog_app      │                     │
+│         │   Port: 8000    │                     │
+│         │   FastAPI       │                     │
+│         └─────────────────┘                     │
+│                  ↑                              │
+│         ┌─────────────────┐                     │
+│         │ ollama-pull     │                     │
+│         │ (init service)  │                     │
+│         └─────────────────┘                     │
+│                                                 │
+└─────────────────────────────────────────────────┘
 
-```powershell
-# Navigate to your project directory
-cd "D:\Study\Projects\Blog Generation\BlogGeneration"
+Volumes:
+  - mysql_data      → MySQL persistence
+  - ollama_data     → Ollama models
+  - checkpoint_data → SQLite workflows
 ```
 
-### Step 2: Create Required Docker Files
+## 🔧 Services Configuration
 
-Copy the following files to your project directory:
-- `Dockerfile` (already provided)
-- `docker-compose.yml` (already provided)
-- `.dockerignore` (already provided)
-- `init.sql` (already provided)
+### App Service (FastAPI)
 
-### Step 3: Update .env File for Docker
+```yaml
+Ports: 8000:8000
+Image: Built from Dockerfile
+Depends: mysql, ollama
+Health: curl http://localhost:8000/health
+Restart: unless-stopped
 
-Your current `.env` should work, but make sure it has:
+Volumes:
+  - checkpoint_data:/app/data  # SQLite workflow state
+  - ./.env:/app/.env:ro        # Environment config (optional)
+
+Environment:
+  DB_HOST: mysql               # Container name
+  DB_PORT: 3306               # Internal port
+  OLLAMA_BASE_URL: http://ollama:11434
+```
+
+### MySQL Service
+
+```yaml
+Ports: 3307:3306              # External:Internal
+Image: mysql:8.0
+Health: mysqladmin ping
+Restart: unless-stopped
+
+Volumes:
+  - mysql_data:/var/lib/mysql
+  - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+Environment:
+  MYSQL_ROOT_PASSWORD: ${PASSWORD}
+  MYSQL_DATABASE: blog_db
+```
+
+### Ollama Service
+
+```yaml
+Ports: 11434:11434
+Image: ollama/ollama:latest
+Health: ollama list
+Restart: unless-stopped
+
+Volumes:
+  - ollama_data:/root/.ollama  # Model storage (~500MB-4GB)
+```
+
+### Ollama-Pull (Init Service)
+
+```yaml
+Purpose: Download qwen2.5:0.5b model on first run
+Depends: ollama
+Restart: no (runs once)
+```
+
+## ⚙️ Environment Variables
+
+Create `.env` file:
 
 ```env
-# Database Configuration
+# Database
 DATABASE=blog_db
-PASSWORD=abcd@1234
+PASSWORD=secure_password_here
+MYSQL_ROOT_PASSWORD=secure_password_here
+DB_HOST=mysql                    # Container name
+DB_PORT=3306                     # Internal port
+DB_USER=root
 
-# LangChain Configuration
+# LangChain (Optional - for tracing)
 LANGCHAIN_TRACING_V2=true
-LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
-LANGCHAIN_API_KEY=your_api_key_here
+LANGCHAIN_API_KEY=lsv2_pt_...
 LANGCHAIN_PROJECT=BlogGeneration
 
-# Application Configuration
+# Ollama
+OLLAMA_BASE_URL=http://ollama:11434
+
+# Application
 DEBUG=false
 MAX_CONCURRENT_GENERATIONS=5
-
-# Get Ollama URL from environment variable (set in docker-compose.yml)
-OLLAMA_BASE_URL = "http://localhost:11434"
 ```
 
-### Step 4: Build and Run with Docker Compose
+## 🚀 Common Operations
 
-```powershell
-# Docker Images
-docker images
-docker ps -a
+### Deployment
 
-# Remove images (if rebuilding after changes)
-docker rmi -f 415961b5186e
-
-# Remove dangling images (optional but recommended after project changes)
-docker builder prune
-docker builder prune -a
-docker system prune -f
-
-# Build all services (use --no-cache if you've changed dependencies)
-docker-compose build -d
-docker-compose build --no-cache app
-
-# Rebuild and restart everything (useful after code changes)
-docker-compose up --build -d
-docker-compose up --build -d app
-docker-compose build --no-cache app
-
+```bash
 # Start all services
-docker compose up
 docker-compose up -d
+
+# Start specific service
 docker-compose up -d app
+
+# Build and start (after code changes)
+docker-compose up --build -d
+
+# Build without cache
+docker-compose build --no-cache app
+```
+
+### Monitoring
+
+```bash
+# View logs (all services)
+docker-compose logs -f
+
+# View specific service
+docker-compose logs -f app
+docker logs blog_app
 
 # Check status
 docker-compose ps
 
-# Check logs (monitor AI generation logs)
-docker-compose logs -f app
-
-# Pull Ollama model (qwen2.5:0.5b for Gen AI)
-docker-compose up ollama-pull
-
-# Check if model is downloaded
-docker-compose exec ollama ollama list
-```
-
-### Step 5: Wait for Ollama Model Download
-
-The first run will download the Ollama model (~400MB):
-
-```powershell
-# Monitor the download progress
-docker-compose logs -f ollama-pull
-
-# You should see:
-# "Pulling qwen2.5:0.5b model..."
-# "Model pulled successfully!"
-```
-
-### Step 6: Verify Everything is Running
-
-```powershell
-# Check all services
-docker-compose ps
-
-# Should show all services as "Up (healthy)"
-
-# Test the application
-curl http://localhost:8000/health
-# Or open in browser: http://localhost:8000/health
-```
-
-### Step 7: Access the Application
-
-Open your browser and go to: **http://localhost:8000**
-
-## Windows-Specific Commands
-
-### Using PowerShell
-
-```powershell
-# Start services
-docker-compose up -d
-docker-compose up -d app
-
-# View logs
-docker-compose logs -f
-docker logs blog_app
-docker logs -f blog_app
-
-# Stop services
-docker-compose down
-
-# Restart services
-docker-compose restart
-
-# Check service status
-docker-compose ps
-
-# View resource usage
+# Resource usage
 docker stats blog_app blog_mysql blog_ollama
 ```
 
-### Using Command Prompt (CMD)
+### Maintenance
 
-Same commands work in CMD:
+```bash
+# Restart service
+docker-compose restart app
 
-```cmd
-docker-compose up -d
-docker-compose logs -f
+# Stop all
 docker-compose down
-docker-compose ps
-```
 
-## Working with Your Existing Database
+# Stop and remove volumes (⚠️ DATA LOSS)
+docker-compose down -v
 
-Since you already have `blog_workflow.db` locally:
-
-### Option 1: Use Docker Volumes (Recommended)
-
-The checkpoint database will be created fresh in Docker:
-
-```powershell
-# This is automatic - Docker will create a new blog_workflow.db
+# Update images
+docker-compose pull
 docker-compose up -d
 ```
 
-### Option 2: Mount Your Existing Database
+### Database Access
 
-Modify `docker-compose.yml`:
+```bash
+# MySQL shell
+docker-compose exec mysql mysql -u root -p
+# Password from .env
+
+# Run SQL query
+docker-compose exec mysql mysql -u root -p${PASSWORD} blog_db -e "SELECT COUNT(*) FROM blog_posts;"
+
+# Backup database
+docker-compose exec -T mysql mysqldump -u root -p${PASSWORD} blog_db > backup.sql
+
+# Restore database
+cat backup.sql | docker-compose exec -T mysql mysql -u root -p${PASSWORD} blog_db
+```
+
+### Ollama Management
+
+```bash
+# List models
+docker-compose exec ollama ollama list
+
+# Pull new model
+docker-compose exec ollama ollama pull llama3.2:1b
+
+# Remove model
+docker-compose exec ollama ollama rm qwen2.5:0.5b
+
+# Model size check
+docker-compose exec ollama du -sh /root/.ollama/models
+```
+
+## 🐛 Troubleshooting
+
+### Service Won't Start
+
+```bash
+# Check logs for errors
+docker-compose logs app
+
+# Common issues:
+# 1. Port conflict
+netstat -ano | findstr :8000    # Windows
+lsof -i :8000                   # Mac/Linux
+
+# 2. Environment variables
+docker-compose config           # Validate compose file
+
+# 3. Rebuild
+docker-compose down
+docker-compose up --build
+```
+
+### Database Connection Failed
+
+```bash
+# Verify MySQL is healthy
+docker-compose ps mysql
+
+# Test connection
+docker-compose exec mysql mysql -u root -p
+
+# Check network
+docker network inspect bloggeneration_blog_network
+
+# Verify DB_HOST in .env is "mysql" (not "localhost")
+```
+
+### Ollama Model Issues
+
+```bash
+# Check if model downloaded
+docker-compose logs ollama-pull
+
+# Should show: "Model pulled successfully!"
+
+# Manually pull
+docker-compose exec ollama ollama pull qwen2.5:0.5b
+
+# Verify
+docker-compose exec ollama ollama list
+
+# Restart if needed
+docker-compose restart ollama
+```
+
+### Workflow State Issues
+
+```bash
+# Check SQLite checkpoint volume
+docker volume inspect bloggeneration_checkpoint_data
+
+# Access checkpoint database
+docker-compose exec app sqlite3 /app/data/blog_workflow.db
+sqlite> SELECT thread_id FROM checkpoints;
+
+# Reset checkpoints (⚠️ loses pending workflows)
+docker volume rm bloggeneration_checkpoint_data
+docker-compose up -d
+```
+
+## 📊 Performance Tuning
+
+### Resource Limits
+
+Add to `docker-compose.yml`:
 
 ```yaml
 app:
-  volumes:
-    - checkpoint_data:/app/data
-    - ./blog_workflow.db:/app/blog_workflow.db
+  deploy:
+    resources:
+      limits:
+        cpus: '2.0'
+        memory: 2G
+      reservations:
+        memory: 1G
+
+mysql:
+  deploy:
+    resources:
+      limits:
+        memory: 1G
+
+ollama:
+  deploy:
+    resources:
+      limits:
+        cpus: '4.0'
+        memory: 4G
 ```
 
-Then:
-```powershell
-docker-compose up -d
+### Volume Performance
+
+```bash
+# Check volume usage
+docker system df -v
+
+# Cleanup unused volumes
+docker volume prune
+
+# Backup before cleanup
+docker run --rm -v bloggeneration_checkpoint_data:/data \
+  -v $(pwd)/backups:/backup alpine \
+  tar czf /backup/checkpoint_backup.tar.gz -C /data .
 ```
 
-## Windows Path Considerations
+## 🔐 Security Best Practices
 
-### File Paths in docker-compose.yml
+### 1. Environment Variables
 
-Windows paths should use forward slashes in Docker:
+```bash
+# Never commit .env to git
+echo ".env" >> .gitignore
+
+# Use strong passwords
+PASSWORD=$(openssl rand -base64 32)
+```
+
+### 2. Network Isolation
 
 ```yaml
-# Correct
-- ./static:/app/static
-
-# Also works
-- D:/Study/Projects/Blog Generation/BlogGeneration/static:/app/static
-```
-
-### Volume Mounting
-
-Docker Desktop for Windows handles volume mounting automatically:
-
-```yaml
-volumes:
-  - ./blog_workflow.db:/app/blog_workflow.db  # Windows path converted automatically
-```
-
-## Troubleshooting on Windows
-
-### Issue: Docker Desktop Won't Start
-
-**Solution:**
-1. Enable Hyper-V:
-   ```powershell
-   # Run PowerShell as Administrator
-   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-   ```
-
-2. Enable WSL 2:
-   ```powershell
-   # Run PowerShell as Administrator
-   wsl --install
-   wsl --set-default-version 2
-   ```
-
-3. Restart computer
-
-### Issue: Port Already in Use
-
-**Check what's using the port:**
-```powershell
-# Check port 8000
-netstat -ano | findstr :8000
-
-# Check port 3306 (MySQL)
-netstat -ano | findstr :3306
-
-# Check port 11434 (Ollama)
-netstat -ano | findstr :11434
-```
-
-**Kill the process:**
-```powershell
-# Find PID from netstat output, then:
-taskkill /PID <PID> /F
-
-# Example:
-taskkill /PID 12345 /F
-```
-
-### Issue: Permission Denied Errors
-
-**Solution:**
-1. Run PowerShell/CMD as Administrator
-2. Or adjust Docker Desktop settings:
-   - Docker Desktop → Settings → Resources → File Sharing
-   - Add your project directory
-
-### Issue: Slow Performance
-
-**Solution:**
-1. Allocate more resources to Docker:
-   - Docker Desktop → Settings → Resources
-   - Increase CPUs to 4+
-   - Increase Memory to 8GB+
-   - Increase Disk image size to 50GB+
-
-2. Use WSL 2 backend (faster than Hyper-V):
-   - Docker Desktop → Settings → General
-   - Enable "Use the WSL 2 based engine"
-
-### Issue: Volume Mounting Not Working
-
-**Solution:**
-```powershell
-# Reset Docker Desktop
-# Docker Desktop → Troubleshoot → Reset to factory defaults
-
-# Or manually reset volumes
-docker-compose down -v
-docker volume prune -f
-docker-compose up -d
-```
-
-### Issue: MySQL Connection Failed
-
-**Check MySQL is running:**
-```powershell
-docker-compose ps mysql
-
-# View MySQL logs
-docker-compose logs mysql
-
-# Access MySQL shell
-docker-compose exec mysql mysql -u root -p
-# Password: abcd@1234 (or your .env PASSWORD)
-```
-
-**Test connection:**
-```powershell
-# From Windows (if MySQL client installed)
-mysql -h 127.0.0.1 -P 3306 -u root -p
-
-# Or from Docker
-docker-compose exec mysql mysql -u root -p
-```
-
-## Combining Local Development with Docker
-
-### Scenario 1: Run Only Database in Docker
-
-Use Docker for MySQL and Ollama, run app locally:
-
-```powershell
-# Start only MySQL and Ollama
-docker-compose up -d mysql ollama
-
-# Wait for services to be ready
-timeout 20
-
-# In your venv, run app locally
-venv\Scripts\activate
-python main.py
-```
-
-Update connection in `database.py`:
-```python
-DB_HOST = "localhost"  # Instead of "mysql"
-```
-
-### Scenario 2: Run Everything in Docker
-
-```powershell
-docker-compose up -d
-```
-
-### Scenario 3: Development Mode
-
-Create `docker-compose.dev.yml`:
-
-```yaml
-version: '3.8'
+# In docker-compose.yml
+networks:
+  blog_network:
+    driver: bridge
+    internal: true  # No external access
 
 services:
   app:
+    networks:
+      - blog_network
+    ports:
+      - "8000:8000"  # Only expose necessary ports
+```
+
+### 3. Read-Only Mounts
+
+```yaml
+volumes:
+  - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  - ./.env:/app/.env:ro
+```
+
+## 📦 Multi-Environment Setup
+
+### Development
+
+```bash
+# Use docker-compose.override.yml for dev settings
+cat > docker-compose.override.yml << EOF
+version: '3.8'
+services:
+  app:
     volumes:
-      - .:/app  # Mount entire directory for hot reload
+      - .:/app  # Live reload
     environment:
       DEBUG: "true"
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+EOF
+
+docker-compose up
 ```
 
-Run:
-```powershell
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+### Production
+
+```bash
+# Use production compose file
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# docker-compose.prod.yml example:
+services:
+  app:
+    restart: always
+    environment:
+      DEBUG: "false"
+    deploy:
+      replicas: 2
 ```
 
-## Windows Batch Scripts
+## 🔄 CI/CD Integration
 
-Create `start.bat`:
+### Build & Push
 
-```batch
-@echo off
-echo Starting AI Blog Generator...
-docker-compose up -d
-echo.
-echo Services starting...
-timeout /t 10 /nobreak >nul
+```bash
+# Build image
+docker build -t blog-generator:latest .
+
+# Tag for registry
+docker tag blog-generator:latest registry.example.com/blog-generator:1.0.0
+
+# Push
+docker push registry.example.com/blog-generator:1.0.0
+```
+
+### Automated Deployment
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Deploy to server
+        run: |
+          docker-compose pull
+          docker-compose up -d --build
+```
+
+## 📋 Health Checks
+
+### Service Health
+
+```bash
+# Check all services
 docker-compose ps
-echo.
-echo Application available at: http://localhost:8000
-pause
+
+# Should show "healthy" status:
+# blog_app    ... Up (healthy)
+# blog_mysql  ... Up (healthy)
+# blog_ollama ... Up (healthy)
+
+# Manual health check
+curl http://localhost:8000/health
+curl http://localhost:11434/api/tags
 ```
 
-Create `stop.bat`:
+### Custom Health Script
 
-```batch
-@echo off
-echo Stopping AI Blog Generator...
-docker-compose down
-echo.
-echo All services stopped.
-pause
+```bash
+#!/bin/bash
+# health-check.sh
+
+set -e
+
+# App health
+curl -f http://localhost:8000/health || exit 1
+
+# MySQL health
+docker-compose exec -T mysql mysqladmin ping -h localhost || exit 1
+
+# Ollama health
+curl -f http://localhost:11434/api/tags || exit 1
+
+echo "✓ All services healthy"
 ```
 
-Create `logs.bat`:
+## 📚 Additional Resources
 
-```batch
-@echo off
-docker-compose logs -f
+- **Docker Docs**: https://docs.docker.com/compose/
+- **MySQL Image**: https://hub.docker.com/_/mysql
+- **Ollama Image**: https://hub.docker.com/r/ollama/ollama
+- **FastAPI Deployment**: https://fastapi.tiangolo.com/deployment/docker/
+
+## 🆘 Quick Reference
+
+```bash
+# Essential commands
+docker-compose up -d              # Start
+docker-compose down               # Stop
+docker-compose logs -f app        # Logs
+docker-compose restart app        # Restart
+docker-compose exec app sh        # Shell access
+
+# Database
+docker-compose exec mysql mysql -u root -p
+
+# Cleanup
+docker-compose down -v            # Remove volumes
+docker system prune -a            # Clean everything
+
+# Backup
+docker-compose exec -T mysql mysqldump -u root -p${PASSWORD} blog_db > backup.sql
 ```
-
-Create `restart.bat`:
-
-```batch
-@echo off
-echo Restarting AI Blog Generator...
-docker-compose restart
-echo.
-echo Services restarted.
-docker-compose ps
-pause
-```
-
-## PowerShell Functions
-
-Add to your PowerShell profile:
-
-```powershell
-# Edit profile
-notepad $PROFILE
-
-# Add these functions:
-
-function Start-BlogGen {
-    Set-Location "D:\Study\Projects\Blog Generation\BlogGeneration"
-    docker-compose up -d
-    Write-Host "Services starting..." -ForegroundColor Green
-    Start-Sleep -Seconds 10
-    docker-compose ps
-    Write-Host "`nApplication: http://localhost:8000" -ForegroundColor Cyan
-}
-
-function Stop-BlogGen {
-    Set-Location "D:\Study\Projects\Blog Generation\BlogGeneration"
-    docker-compose down
-    Write-Host "Services stopped." -ForegroundColor Yellow
-}
-
-function Show-BlogGenLogs {
-    Set-Location "D:\Study\Projects\Blog Generation\BlogGeneration"
-    docker-compose logs -f
-}
-
-function Show-BlogGenStatus {
-    Set-Location "D:\Study\Projects\Blog Generation\BlogGeneration"
-    docker-compose ps
-}
-```
-
-Then use:
-```powershell
-Start-BlogGen
-Stop-BlogGen
-Show-BlogGenLogs
-Show-BlogGenStatus
-```
-
-## Backup and Restore on Windows
-
-### Backup Everything
-
-```powershell
-# Create backups directory
-mkdir backups
-
-# Backup MySQL
-docker-compose exec -T mysql mysqldump -u root -pabcd@1234 blog_db > backups\blog_db_backup.sql
-
-# Backup volumes
-docker run --rm -v blog_generation_checkpoint_data:/data -v ${PWD}/backups:/backup alpine tar czf /backup/checkpoint_backup.tar.gz -C /data .
-
-docker run --rm -v blog_generation_mysql_data:/data -v ${PWD}/backups:/backup alpine tar czf /backup/mysql_backup.tar.gz -C /data .
-```
-
-### Restore from Backup
-
-```powershell
-# Restore MySQL
-Get-Content backups\blog_db_backup.sql | docker-compose exec -T mysql mysql -u root -pabcd@1234 blog_db
-
-# Restore volumes
-docker run --rm -v blog_generation_checkpoint_data:/data -v ${PWD}/backups:/backup alpine tar xzf /backup/checkpoint_backup.tar.gz -C /data
-```
-
-## Performance Tips for Windows
-
-1. **Enable WSL 2** (much faster):
-   - Docker Desktop → Settings → General → Use WSL 2
-
-2. **Store files in WSL 2** (optional, for better performance):
-   ```powershell
-   # Access WSL filesystem
-   wsl
-   cd /home/your_username/
-   # Clone/move project here
-   ```
-
-3. **Increase Docker Resources**:
-   - Docker Desktop → Settings → Resources
-   - CPUs: 4-6
-   - Memory: 8GB+
-   - Swap: 2GB
-   - Disk: 50GB+
-
-4. **Disable Antivirus Scanning** for Docker directories:
-   - Add exclusions for:
-     - `C:\ProgramData\Docker`
-     - `C:\Users\<YourUser>\AppData\Local\Docker`
-     - Your project directory
-
-## Next Steps
-
-1. **Start the stack:**
-   ```powershell
-   cd "D:\Study\Projects\Blog Generation\BlogGeneration"
-   docker-compose up -d
-   ```
-
-2. **Monitor logs:**
-   ```powershell
-   docker-compose logs -f
-   ```
-
-3. **Access application:**
-   - Open browser: http://localhost:8000
-
-4. **Stop when done:**
-   ```powershell
-   docker-compose down
-   ```
-
-## Additional Resources
-
-- Docker Desktop for Windows: https://docs.docker.com/desktop/windows/
-- WSL 2 Setup: https://docs.microsoft.com/en-us/windows/wsl/install
-- Docker Compose: https://docs.docker.com/compose/
-- Troubleshooting: https://docs.docker.com/desktop/troubleshoot/overview/
 
 ---
 
-**Your Windows setup is ready! Just run `docker-compose up -d` to get started!**
+**For detailed architecture and HITL workflow documentation, see [PROJECT.md](PROJECT.md)**
 
+**For application usage and API docs, see [README.md](README.md)**
