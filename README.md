@@ -619,10 +619,9 @@ BlogGeneration/
 │   ├── index.html         # Frontend UI
 │   ├── style.css          # Styling
 │   └── script.js          # Client-side logic
-└── docs/
-    ├── PROJECT.md         # Detailed architecture docs
-    ├── DOCKER_README.md   # Docker setup guide
-    └── README.md          # This file
+├── PROJECT.md              # Detailed architecture docs
+├── DOCKER_README.md        # Docker setup guide
+└── README.md               # This file
 ```
 
 ### Running Tests
@@ -725,8 +724,8 @@ cat backup.sql | docker-compose exec -T mysql mysql -u root -p${PASSWORD} blog_d
 
 ## 📖 Additional Resources
 
-- **Detailed Architecture**: See [PROJECT.md](docs/PROJECT.md)
-- **Docker Guide**: See [DOCKER_README.md](docs/DOCKER_README.md)
+- **Detailed Architecture**: See [PROJECT.md](PROJECT.md)
+- **Docker Guide**: See [DOCKER_README.md](DOCKER_README.md)
 - **LangGraph Docs**: https://langchain-ai.github.io/langgraph/
 - **FastAPI Docs**: https://fastapi.tiangolo.com
 - **Ollama Models**: https://ollama.ai/library
@@ -756,13 +755,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For issues, questions, or feature requests:
 
-1. Check the [Troubleshooting](#-troubleshooting) section
-2. Review [PROJECT.md](docs/PROJECT.md) for detailed architecture
+1. Check the [Troubleshooting](https://github.com/VikasPrajapati1998/BlogGeneration/issues) section
+2. Review [PROJECT.md](PROJECT.md) for detailed architecture
 3. Search existing [GitHub Issues](https://github.com/your-repo/issues)
 4. Open a new issue with detailed information
 
 ---
 
-**Built with ❤️ using LangChain, LangGraph, FastAPI, and Docker**
+**Built with using LangChain, LangGraph, FastAPI, and Docker**
 
-**Powered by Vikas Prajapati for production-ready AI workflows**
+**Powered by [Vikas Prajapati](https://www.linkedin.com/in/vikas1998/) for production-ready AI workflows**
